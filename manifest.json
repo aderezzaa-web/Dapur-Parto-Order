@@ -1,0 +1,16 @@
+{
+  "name": "Dapur Parto",
+  "short_name": "Dapur Parto",
+  "description": "Pesan kopi dan teh susu botolan Dapur Parto, kirim pesanan lewat WhatsApp.",
+  "lang": "id",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F2E3CE",
+  "theme_color": "#F2E3CE",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
