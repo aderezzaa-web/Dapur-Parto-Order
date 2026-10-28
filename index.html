@@ -72,6 +72,14 @@ body.promo-off .promo{display:none}
 .done{display:flex;flex-direction:column;gap:14px}
 .done p{margin:0}
 .done-code{font-size:40px;line-height:1}
+.extras{margin:16px 0 12px;display:flex;flex-direction:column;gap:8px}
+.extras-h{margin:0;font-weight:700;font-size:15px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.extras-h span{font-weight:500;color:var(--ink2);font-size:14px}
+.xrow{flex-direction:row !important;align-items:flex-start;gap:12px !important;background:var(--sunk);border-radius:14px;padding:12px 14px;cursor:pointer}
+.xrow input{width:22px;height:22px;flex:0 0 22px;margin:1px 0 0;accent-color:var(--olive);padding:0}
+.xrow b{display:block;font-size:15px}
+.xrow small{display:block;font-weight:400;font-size:14px;color:var(--ink2);margin-top:2px}
+.xrow.off{cursor:not-allowed}.xrow.off b{opacity:.6}
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg)}
 .top-in{max-width:1200px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
 .logo{height:44px;width:auto;display:block}
@@ -215,14 +223,15 @@ const byId=Object.fromEntries(P.map(p=>[p.id,p]));
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 
 // online = menu dari server berhasil dimuat, order tersimpan langsung ke app admin
-let online=false, dbId={}, sugars=[];
+let online=false, dbId={}, sugars=[], extrasList=[];
+let chosen=store.get('dp-extras',[]);
 let cart=store.get('dp-cart2',{}); // key "flavor|size|sugarId" -> qty
 let sel=store.get('dp-sel',{}); P.forEach(p=>{if(!sel[p.id])sel[p.id]=250});
 let sugarSel=store.get('dp-sugar',{});
 let form=Object.assign({nama:'',hp:'',terima:'antar',alamat:'',catatan:'',tgl:'',jam:''},store.get('dp-form',{}));
 let first=store.get('dp-first',!store.get('dp-sent',false));
 let tried=false, sending=false, done=null, sendErr='';
-const save=()=>{store.set('dp-cart2',cart);store.set('dp-sel',sel);store.set('dp-sugar',sugarSel);store.set('dp-form',form)};
+const save=()=>{store.set('dp-extras',chosen);store.set('dp-cart2',cart);store.set('dp-sel',sel);store.set('dp-sugar',sugarSel);store.set('dp-form',form)};
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const imgFor=(id,k)=>IMG[id+(k==1000?'1l':'250')];
@@ -245,7 +254,7 @@ async function loadMenu(){
    (map[fl.id]=map[fl.id]||{})[sz.k]={id:pr.id,price:pr.price};
   });
   if(!Object.keys(map).length)throw 0;
-  dbId=map;online=true;sugars=m.sugarLevels||[];
+  dbId=map;online=true;sugars=m.sugarLevels||[];extrasList=m.extras||[];
   P.forEach(p=>SIZES.forEach(s=>{if(map[p.id]&&map[p.id][s.k])p.price[s.k]=map[p.id][s.k].price}));
   P.forEach(p=>{if(!available(p.id,sel[p.id])){const s=SIZES.find(s=>available(p.id,s.k));if(s)sel[p.id]=s.k}});
   Object.keys(cart).forEach(k=>{const [id,sz]=k.split('|');if(!available(id,+sz))delete cart[k]});
@@ -279,7 +288,11 @@ function renderGrid(){
 }
 
 function lines(){return Object.entries(cart).filter(([,q])=>q>0).map(([key,q])=>{const [id,k,sid]=key.split('|');const p=byId[id];const unit=p.price[k]+sugarPrice(sid);return{key,id,k:+k,sid,q,p,sub:unit*q}})}
-function subtotal(){return lines().reduce((a,l)=>a+l.sub,0)}
+function liters(){return lines().reduce((a,l)=>a+l.q*l.k/1000,0)}
+function fmtL(v){return (Math.round(v*100)/100).toLocaleString('id-ID')+' liter'}
+function eligible(x){return !x.minLiters||liters()+1e-9>=x.minLiters}
+function activeExtras(){chosen=chosen.filter(id=>{const x=extrasList.find(e=>e.id===id);return x&&eligible(x)});return chosen.map(id=>extrasList.find(e=>e.id===id))}
+function subtotal(){return lines().reduce((a,l)=>a+l.sub,0)+activeExtras().reduce((a,x)=>a+(x.price||0),0)}
 function discount(){return first?Math.round(subtotal()*0.1):0}
 function total(){return subtotal()-discount()}
 function bottles(){return lines().reduce((a,l)=>a+l.q,0)}
@@ -289,6 +302,7 @@ function when(){if(!form.tgl||!form.jam)return '';const d=new Date(form.tgl+'T00
 function fullMessage(){
  const L=lines();let m='Halo Dapur Parto, saya mau pesan:\n';
  L.forEach(l=>{m+=`- ${l.q}x ${lineName(l)} (${rp(l.sub)})\n`});
+ activeExtras().forEach(x=>{m+=`- ${x.name} (${x.price?rp(x.price):'gratis'})\n`});
  if(first)m+=`\nSubtotal: ${rp(subtotal())}\nDiskon pesanan pertama 10%: -${rp(discount())}`;
  m+=`\nTotal: ${rp(total())}`+(form.terima==='antar'?' (belum termasuk ongkir ojol)':'')+'\n';
  m+=`Nama: ${form.nama.trim()}\nNo. WA: ${form.hp.trim()}\n`;
@@ -298,6 +312,21 @@ function fullMessage(){
  return m;
 }
 function waLink(t){return 'https://wa.me/'+WA+'?text='+encodeURIComponent(t)}
+// Pesan WhatsApp setelah order tersimpan: pakai angka dari server supaya sama dengan di app admin.
+function orderMessage(d,pl){
+ const its=Array.isArray(d.items)&&d.items.length?d.items:null;
+ let m=`Halo Dapur Parto, saya baru pesan lewat web.\nNo. order: ${d.code}\n\nPesanan:\n`;
+ if(its)its.forEach(it=>{m+=`- ${it.qty}x ${it.name}${it.sugarLevel&&it.sugarLevel.name?', '+it.sugarLevel.name:''} (${rp(it.subtotal)})\n`});
+ else lines().forEach(l=>{m+=`- ${l.q}x ${lineName(l)} (${rp(l.sub)})\n`});
+ (Array.isArray(d.extras)?d.extras:[]).forEach(x=>{m+=`- ${x.name} (${x.price?rp(x.price):'gratis'})\n`});
+ if(d.discountAmount)m+=`\nSubtotal: ${rp(d.subtotal)}\nDiskon pesanan pertama 10%: -${rp(d.discountAmount)}`;
+ m+=`\nTotal: ${rp(d.total)}`+(pl.method==='ojol'?' (belum termasuk ongkir ojol)':'')+'\n\n';
+ m+=`Nama: ${pl.name}\nNo. WA: ${pl.phone}\n`;
+ if(when())m+=`Jadwal: ${when()}\n`;
+ m+=pl.method==='ojol'?`Pengiriman: ojol instan ke ${pl.address}\n`:'Pengiriman: pickup di Cipedak\n';
+ if(pl.notes)m+=`Catatan: ${pl.notes}\n`;
+ return m;
+}
 function errors(){const e={};
  if(!form.nama.trim())e.nama='Isi nama kamu dulu.';
  if(form.hp.replace(/\D/g,'').length<9)e.hp='Isi nomor WhatsApp yang aktif.';
@@ -306,6 +335,14 @@ function errors(){const e={};
  if(!form.jam)e.jam='Pilih jam.';
  return e}
 
+function extrasHtml(){
+ if(!online||!extrasList.length)return '';
+ const L=liters();
+ return `<div class="extras"><p class="extras-h">Tambahan <span>Total belanjamu ${fmtL(L)}</span></p>${extrasList.map(x=>{
+  const ok=eligible(x),on=ok&&chosen.includes(x.id);
+  const info=ok?(x.price?'+'+rp(x.price):'Gratis'):'Minimal belanja '+fmtL(x.minLiters)+'. Kurang '+fmtL(x.minLiters-L)+' lagi.';
+  return `<label class="xrow${ok?'':' off'}"><input type="checkbox" class="xchk" data-id="${esc(x.id)}" ${on?'checked':''} ${ok?'':'disabled'}><span><b>${esc(x.name)}</b><small>${info}</small></span></label>`}).join('')}</div>`;
+}
 function renderCart(){
  const L=lines(),n=bottles(),t=total();
  $('#count').textContent=n;
@@ -313,7 +350,7 @@ function renderCart(){
  $('#barLabel').textContent='Keranjang, '+n+' botol';$('#barTotal').textContent=rp(t);
  const body=$('#cartBody');
  if(done){
-  const msg=`Halo Dapur Parto, saya baru pesan lewat web.\nNomor order: ${done.code}\nNama: ${done.nama}\nTotal: ${rp(done.total)}`+(done.ojol?' (belum termasuk ongkir ojol)':'');
+  const msg=done.msg;
   body.innerHTML=`<div class="done"><p class="done-code display">${esc(done.code)}</p><p><b>Pesananmu sudah masuk.</b> Total ${rp(done.total)}${done.ojol?', ongkir ojol menyusul':''}. Lanjut chat supaya kami bisa konfirmasi jadwal dan pembayaran.</p>
   <a class="send" href="${waLink(msg)}" target="_blank" rel="noopener">${waIcon}Lanjut chat di WhatsApp</a>
   <button class="ghost" data-act="new">Buat pesanan lain</button></div>`;
@@ -325,6 +362,7 @@ function renderCart(){
  const ia=(k)=>`aria-invalid="${!!e[k]}" ${e[k]?`aria-describedby="e-${k}"`:''}`;
  body.innerHTML=`<ul class="items">${L.map(l=>`<li class="item" data-key="${esc(l.key)}"><img src="${imgFor(l.id,l.k)}" alt=""><div><div class="nm">${esc(l.p.name)}</div><div class="sub">${sizeLabel(l.k)}${l.sid&&sugarName(l.sid)?', '+esc(sugarName(l.sid)):''}, ${rp(l.sub)}</div></div>
  <div class="step" role="group" aria-label="Jumlah ${esc(lineName(l))}"><button data-act="cdec" aria-label="Kurangi">−</button><output>${l.q}</output><button data-act="cinc" aria-label="Tambah">+</button></div></li>`).join('')}</ul>
+ ${extrasHtml()}
  <label class="first"><input type="checkbox" id="firstChk" ${first?'checked':''}><span>Ini pesanan pertamaku<small>Dapat diskon 10%. Admin mengecek nomor WhatsApp-mu sebelum konfirmasi.</small></span></label>
  ${first?`<div class="lines"><div><span>Subtotal</span><span>${rp(subtotal())}</span></div><div class="disc"><span>Diskon pesanan pertama</span><span>−${rp(discount())}</span></div></div>`:''}
  <div class="sum"><span>Total, ${n} botol</span><span class="display">${rp(t)}</span></div>
@@ -354,14 +392,14 @@ async function submit(){
  sending=true;sendErr='';renderCart();
  const trap=document.querySelector('.hp-trap');
  const payload={name:form.nama.trim(),phone:form.hp.trim(),method:form.terima==='antar'?'ojol':'pickup',address:form.alamat.trim(),notes:form.catatan.trim(),
-  date:form.tgl,time:form.jam,first,website:trap?trap.value:'',
+  date:form.tgl,time:form.jam,first,website:trap?trap.value:'',extras:activeExtras().map(x=>x.id),
   items:lines().map(l=>({productId:dbId[l.id][l.k].id,qty:l.q,sugarLevelId:l.sid||null}))};
  try{
   const r=await fetch(FN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const d=await r.json().catch(()=>({}));
   if(!r.ok||!d.ok)throw new Error(d.error||'Pesanan belum tersimpan.');
-  done={code:d.code,total:d.total,nama:payload.name,ojol:payload.method==='ojol'};
-  cart={};first=false;tried=false;store.set('dp-sent',true);store.set('dp-first',false);save();
+  done={code:d.code,total:d.total,nama:payload.name,ojol:payload.method==='ojol',msg:orderMessage(d,payload)};
+  cart={};chosen=[];first=false;tried=false;store.set('dp-sent',true);store.set('dp-first',false);save();
  }catch(err){sendErr=(err&&err.message?err.message:'Koneksi terputus.')+' Pesananmu belum masuk.'}
  sending=false;renderGrid();renderCart();
  if(done){const a=document.querySelector('.done .send');a&&a.focus()}
@@ -394,6 +432,7 @@ $('#cartBody').addEventListener('click',ev=>{
 $('#cartBody').addEventListener('input',ev=>{const t=ev.target;if(!t.name||t.name==='website')return;form[t.name]=t.value;save();
  const a=$('#send');if(a)a.href=waLink(fullMessage());
  if(tried&&t.getAttribute('aria-invalid')==='true'&&String(t.value).trim()){t.setAttribute('aria-invalid','false');const er=t.parentElement.querySelector('.err');er&&er.remove()}});
+$('#cartBody').addEventListener('change',ev=>{const x=ev.target.closest('.xchk');if(!x)return;const id=x.dataset.id;chosen=x.checked?[...new Set([...chosen,id])]:chosen.filter(c=>c!==id);save();renderCart();const again=document.querySelector(`.xchk[data-id="${CSS.escape(id)}"]`);again&&again.focus()});
 $('#cartBody').addEventListener('change',ev=>{if(ev.target.id!=='firstChk')return;first=ev.target.checked;store.set('dp-first',first);renderCart();const c=$('#firstChk');c&&c.focus()});
 $('#cartBody').addEventListener('submit',ev=>{ev.preventDefault();submit()});
 $('#cartBody').addEventListener('click',ev=>{const a=ev.target.closest('#send');if(!a)return;

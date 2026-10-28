@@ -1,6 +1,6 @@
 // Dapur Parto: simpan halaman supaya tetap terbuka saat sinyal lemah.
 // Ganti angka versi setiap kali index.html diperbarui.
-const CACHE = 'dapur-parto-v2';
+const CACHE = 'dapur-parto-v4';
 const FILES = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -12,7 +12,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
-  if (req.url.includes('.supabase.co')) return;
+  if (req.url.includes('.supabase.co')) return; // menu & order selalu langsung ke server
   const url = new URL(req.url);
   // Halaman: ambil versi terbaru dulu, pakai simpanan kalau offline.
   if (req.mode === 'navigate') {
